@@ -1,0 +1,123 @@
+// csvkit: read and write CSV (RFC 4180): quoted fields, "" for a quote
+// inside quotes, and line breaks inside quoted fields.
+
+// Rows of fields, separated by commas.
+pub fn parse(text: String) -> Result<List<List<String>>, String> {
+    return parse_with(text, ",")
+}
+
+// Like `parse`, with another separator such as ";" or "\t".
+pub fn parse_with(text: String, separator: String) -> Result<List<List<String>>, String> {
+    var rows: List<List<String>> = []
+    var row: List<String> = []
+    var field = ""
+    var quoted = false
+    var after_quote = false
+    var line = 1
+    var row_has_data = false
+    for c in text.chars() {
+        if quoted {
+            if c == "\"" {
+                quoted = false
+                after_quote = true
+            } else {
+                if c == "\n" || c == "\r\n" {
+                    line += 1
+                }
+                field = field + c
+            }
+        } else if c == "\"" {
+            if after_quote {
+                // "" inside a quoted field is one quote.
+                field = field + "\""
+                quoted = true
+                after_quote = false
+            } else if field.is_empty() {
+                quoted = true
+                row_has_data = true
+            } else {
+                return Err("line {line}: a quote may only start a field")
+            }
+        } else if c == separator {
+            row.push(field)
+            field = ""
+            after_quote = false
+            row_has_data = true
+        } else if c == "\n" || c == "\r\n" || c == "\r" {
+            if row_has_data || !field.is_empty() {
+                row.push(field)
+                rows.push(row)
+            }
+            row = []
+            field = ""
+            after_quote = false
+            row_has_data = false
+            line += 1
+        } else {
+            if after_quote {
+                return Err("line {line}: unexpected text after a closing quote")
+            }
+            field = field + c
+            row_has_data = true
+        }
+    }
+    if quoted {
+        return Err("line {line}: a quoted field is not closed")
+    }
+    if row_has_data || !field.is_empty() {
+        row.push(field)
+        rows.push(row)
+    }
+    return Ok(rows)
+}
+
+// Rows as maps from the header (first row) to each value. Every row must
+// have as many fields as the header.
+pub fn records(text: String) -> Result<List<Map<String, String>>, String> {
+    let rows = parse(text)?
+    var out: List<Map<String, String>> = []
+    if rows.is_empty() {
+        return Ok(out)
+    }
+    let header = rows[0]
+    for item in rows.skip(1).enumerate() {
+        let row = item.value
+        if row.length != header.length {
+            return Err("row {item.index + 2} has {row.length} fields, the header has {header.length}")
+        }
+        var record: Map<String, String> = [:]
+        for i in 0..header.length {
+            record[header[i]] = row[i]
+        }
+        out.push(record)
+    }
+    return Ok(out)
+}
+
+// CSV text for rows, quoting fields that need it. Lines end with "\r\n",
+// as RFC 4180 asks.
+pub fn stringify(rows: List<List<String>>) -> String {
+    return stringify_with(rows, ",")
+}
+
+pub fn stringify_with(rows: List<List<String>>, separator: String) -> String {
+    var out = ""
+    for row in rows {
+        out = out + row.map(|f| quote(f, separator)).join(separator) + "\r\n"
+    }
+    return out
+}
+
+// The field as CSV: in quotes when it has a separator, a quote, a line
+// break, or spaces at either end.
+pub fn quote(field: String, separator: String) -> String {
+    let needs = field.contains(separator)
+        || field.contains("\"")
+        || field.contains("\n")
+        || field.contains("\r")
+        || field.trim() != field
+    if !needs {
+        return field
+    }
+    return "\"" + field.replace("\"", "\"\"") + "\""
+}

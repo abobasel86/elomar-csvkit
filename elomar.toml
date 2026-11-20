@@ -1,0 +1,5 @@
+[package]
+name = "csvkit"
+version = "0.1.0"
+description = "Read and write CSV (RFC 4180): quoted fields, quotes and line breaks inside fields, other separators, and rows as maps."
+license = "MIT OR Apache-2.0"

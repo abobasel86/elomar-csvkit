@@ -1,0 +1,53 @@
+use app.csv
+
+fn test_simple_rows() {
+    assert_eq(csv.parse("a,b,c\n1,2,3\n"), Ok([["a", "b", "c"], ["1", "2", "3"]]))
+    assert_eq(csv.parse("a,b\r\n1,2"), Ok([["a", "b"], ["1", "2"]]))
+    assert_eq(csv.parse("a,,c\n"), Ok([["a", "", "c"]]))
+    assert_eq(csv.parse("a,\n"), Ok([["a", ""]]))
+    let none: List<List<String>> = []
+    assert_eq(csv.parse(""), Ok(none))
+}
+
+fn test_quoted_fields() {
+    let text = "name,note\n\"Lina\",\"says \"\"hi\"\", then, leaves\"\n\"Omar\",\"two\nlines\"\n"
+    assert_eq(
+        csv.parse(text),
+        Ok([["name", "note"], ["Lina", "says \"hi\", then, leaves"], ["Omar", "two\nlines"]])
+    )
+    assert_eq(csv.parse("\"\",x"), Ok([["", "x"]]))
+}
+
+fn test_errors() {
+    assert(csv.parse("\"open").is_err())
+    assert(csv.parse("a\"b").is_err())
+    assert(csv.parse("\"a\"b").is_err())
+}
+
+fn test_other_separators() {
+    assert_eq(csv.parse_with("a;b\n1;2", ";"), Ok([["a", "b"], ["1", "2"]]))
+    assert_eq(csv.parse_with("a\tb", "\t"), Ok([["a", "b"]]))
+}
+
+fn test_records() {
+    match csv.records("name,city\nLina,Amman\nOmar,Cairo\n") {
+        Ok(rs) => {
+            assert_eq(rs.length, 2)
+            assert_eq(rs[1]["city"], "Cairo")
+        }
+        Err(e) => assert(false)
+    }
+    assert(csv.records("a,b\n1\n").is_err())
+}
+
+fn test_round_trip() {
+    let rows = [["id", "text"], ["1", "plain"], ["2", "with, comma"], ["3", "quote \" and\nbreak"], ["4", " padded "]]
+    let text = csv.stringify(rows)
+    assert_eq(csv.parse(text), Ok(rows))
+    assert_eq(csv.stringify([["a", "b,c"]]), "a,\"b,c\"\r\n")
+    assert_eq(csv.stringify_with([["a;b", "c"]], ";"), "\"a;b\";c\r\n")
+}
+
+fn test_arabic() {
+    assert_eq(csv.parse("الاسم,المدينة\nلينا,عمّان"), Ok([["الاسم", "المدينة"], ["لينا", "عمّان"]]))
+}
