@@ -112,10 +112,10 @@ pub fn stringify_with(rows: List<List<String>>, separator: String) -> String {
 // break, or spaces at either end.
 pub fn quote(field: String, separator: String) -> String {
     let needs = field.contains(separator)
-    || field.contains("\"")
-    || field.contains("\n")
-    || field.contains("\r")
-    || field.trim() != field
+        || field.contains("\"")
+        || field.contains("\n")
+        || field.contains("\r")
+        || field.trim() != field
     if !needs {
         return field
     }
